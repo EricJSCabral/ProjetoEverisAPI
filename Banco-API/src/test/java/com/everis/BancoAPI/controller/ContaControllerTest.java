@@ -3,7 +3,7 @@ package com.everis.BancoAPI.controller;
 import com.everis.BancoAPI.model.*;
 import com.everis.BancoAPI.repository.ContaRepository;
 import com.everis.BancoAPI.repository.OperacoesRepository;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

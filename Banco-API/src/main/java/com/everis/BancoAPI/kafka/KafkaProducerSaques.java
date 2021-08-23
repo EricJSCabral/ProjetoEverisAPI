@@ -1,4 +1,5 @@
 package com.everis.BancoAPI.kafka;
+import lombok.var;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.IntegerSerializer;
@@ -17,7 +18,6 @@ public class KafkaProducerSaques {
                 ex.printStackTrace();
                 return;
             }
-            //observer
             System.out.println("deu certo");
         }).get();
     }
@@ -27,5 +27,5 @@ public class KafkaProducerSaques {
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class.getName());
         properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class.getName());
         return properties;
-    }
+  }
 }
