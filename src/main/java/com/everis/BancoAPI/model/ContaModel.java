@@ -1,5 +1,8 @@
 package com.everis.BancoAPI.model;
 
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import javax.persistence.*;
 import javax.validation.constraints.*;
 
@@ -35,6 +38,7 @@ public class ContaModel {
 
     @ManyToOne
     @JoinColumn(name = "clientes_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private ClienteModel cliente;
 
     @Column

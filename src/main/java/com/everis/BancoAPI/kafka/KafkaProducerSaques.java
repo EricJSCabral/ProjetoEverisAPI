@@ -1,5 +1,6 @@
 package com.everis.BancoAPI.kafka;
-import lombok.var;
+
+//import lombok.var;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
