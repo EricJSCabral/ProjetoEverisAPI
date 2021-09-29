@@ -1,17 +1,21 @@
 package com.everis.BancoAPI.service;
 
+import com.everis.BancoAPI.exceptions.*;
 import com.everis.BancoAPI.kafka.KafkaProducerSaques;
 import com.everis.BancoAPI.model.*;
 import com.everis.BancoAPI.repository.ClienteRepository;
 import com.everis.BancoAPI.repository.ContaRepository;
 import com.everis.BancoAPI.repository.OperacoesRepository;
 import org.json.simple.JSONObject;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import javax.validation.Valid;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -29,73 +33,49 @@ public class ContaService extends OperacoesService {
     @Autowired
     private ClienteRepository repositoryCli;
 
-    public HttpEntity<?> consultar(String numero){
-        Optional<ContaModel> conta = repository.findByNumero(numero);
-        if(conta.isPresent()) {
-            return repository.findByNumero(numero)
-                    .map(record -> ResponseEntity.ok().body(record))
-                    .orElse(ResponseEntity.notFound().build());
-        } else {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("mensagem:", "Conta não encontrado na base de dados");
-            return ResponseEntity.status(404).body(jsonObject);
-        }
+    @Autowired
+    private ModelMapper modelMapper;
+
+    public ContaModel consultar(String numero){
+        ContaModel conta = repository.findByNumero(numero).orElseThrow(() ->
+                new ContaNaoEncontrada("Conta com número " + numero + " não encontrada na base de dados."));
+        return conta;
     }
 
-    public ResponseEntity<List<?>> listar() {
-        List<ContaModel> contas = (List<ContaModel>) repository.findAll();
+    public List<ContaModel> listar() {
+        List<ContaModel> contas = repository.findAll();
         if (contas.isEmpty()){
-            List<String> json = Collections.singletonList("Não há nenhum registro na base de dados.");
-            return ResponseEntity.status(200).body(json);
+            throw new SemRegistros("Não há nenhum cliente cadastrado.");
         }
-        return ResponseEntity.ok().body(contas);
+        return contas;
     }
 
-    public ResponseEntity<?> salvar(@Valid ContaModel conta) {
-        Optional <ContaModel> c1 = repository.findByNumero(conta.getNumero());
-        Optional <ClienteModel> c2 = repositoryCli.findById(conta.getCliente().getCodigo());
+    public ContaModel salvar(@Valid ContaModel conta) {
 
-        if(conta.getTipo().equals(TipoConta.FISICA) || conta.getTipo().equals(TipoConta.JURIDICA) ||
-                conta.getTipo().equals(TipoConta.GOVERNAMENTAL) ) {
-            if (c2.isPresent()) {
-                if (c1.isPresent()) {
-                    JSONObject jsonObject = new JSONObject();
-                    jsonObject.put("mensagem:", "Já existe uma contGa com esse número na base de dados.");
-                    return ResponseEntity.status(400).body(jsonObject);
-                } else {
-                    repository.save(conta);
-                    return ResponseEntity.ok().body(conta);
-                }
-            } else {
-                JSONObject jsonObject = new JSONObject();
-                jsonObject.put("mensagem:", "Não existe um cliente com código" + conta.getCliente().getCodigo() + " na base de dados.");
-                return ResponseEntity.status(400).body(jsonObject);
-            }
-        } else {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("mensagem:", "O tipo da conta deve ser apenas FISICA, JURIDICA ou GOVERNAMENTAL");
-            return ResponseEntity.status(400).body(jsonObject);
+        Optional<ContaModel> c1 = repository.findByNumero(conta.getNumero());
+        if (c1.isPresent()) {
+            throw new ContaExistente("Já existe uma conta com o número " + conta.getNumero() + " registrada na base de dados.");
         }
+        repositoryCli.findById(conta.getCliente().getCodigo()).orElseThrow(
+                ()-> new ClienteNaoEncontrado("Cliente com código " + conta.getCliente().getCodigo() + " não encontrada na base de dados."));
+
+        return repository.save(modelMapper.map(conta, ContaModel.class));
     }
 
-    public ResponseEntity deletar(String numero) {
-        Optional<ContaModel> conta = repository.findByNumero(numero);
-        JSONObject jsonObject = new JSONObject();
-        if (conta.isPresent()){
-            jsonObject.put("mensagem:", "Conta deletada com sucesso.");
-            jsonObject.put("conta:", conta);
-            repository.deleteById(conta.get().getCodigo());
-            return ResponseEntity.status(202).body(jsonObject);
-        } else {
-            jsonObject.put("mensagem:", "Conta não encontrada na base de dados.");
-            return ResponseEntity.status(404).body(jsonObject);
-        }
+
+    public ContaModel deletar(String numero) {
+        ContaModel conta = repository.findByNumero(numero).orElseThrow(
+                () -> new ClienteNaoEncontrado("Conta com número " + numero + " não encontrada na base de dados."));
+
+        repository.deleteById(conta.getCodigo());
+        return conta;
     }
 
-    public ResponseEntity atualizar(Integer codigo, @Valid ContaModel conta) {
-        Optional<ContaModel> contas = repository.findById(codigo);
-        if (contas.isPresent()) {
-            ContaModel c1 = new ContaModel();
+    public ContaModel atualizar(Integer codigo, @Valid ContaModel conta) {
+
+        ContaModel c1 = repository.findById(codigo).orElseThrow(
+                () -> new ClienteNaoEncontrado("Conta com código " + codigo + " não encontradq na base de dados."));
+
             c1.setCodigo(codigo);
             c1.setAgencia(conta.getAgencia());
             c1.setNumero(conta.getNumero());
@@ -104,131 +84,99 @@ public class ContaService extends OperacoesService {
             c1.setCliente(conta.getCliente());
             c1.setSaldo(conta.getSaldo());
             c1.setSaques(conta.getSaques());
-            repository.save(c1);
-            return ResponseEntity.ok().body(c1);
+            return repository.save(c1);
+    }
+
+    public ContaModel depositar(String numero, TransacaoModel transacao) {
+        ContaModel conta = repository.findByNumero(numero).orElseThrow(() ->
+                new ContaNaoEncontrada("Conta com número " + numero + " não encontrada na base de dados."));
+
+        checaValorNegativo(transacao);
+        conta.setSaldo(conta.getSaldo() + transacao.getValor());
+        repository.save(conta);
+        salvarOperacao(conta, transacao.getValor(), TipoOperacao.DEPOSITO.getDesc());
+        return conta;
+    }
+
+    public ContaModel sacar(String numero, TransacaoModel transacao) {
+        ContaModel conta = repository.findByNumero(numero).orElseThrow(() ->
+                new ContaNaoEncontrada("Conta com número " + numero + " não encontrada na base de dados."));
+
+        checaSaldo(conta, transacao);
+        checaValorNegativo(transacao);
+
+        if (conta.getSaques() < conta.getTipo().getSaques()) {
+            conta.setSaldo(conta.getSaldo() - transacao.getValor());
+            salvarOperacao(conta, transacao.getValor(), TipoOperacao.SAQUE.getDesc());
         } else {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("mensagem:", "Conta não encontrada na base de dados");
-            return ResponseEntity.status(404).body(jsonObject);
+            conta.setSaldo(conta.getSaldo() - transacao.getValor() - conta.getTipo().getTaxa());
+            salvarOperacao(conta, transacao.getValor(), TipoOperacao.SAQUE.getDesc(), conta.getTipo().getTaxa());
+        }
+        repository.save(conta);
+        chamaKafka(numero);
+        return conta;
+    }
+
+    public void chamaKafka(String numero){
+        KafkaProducerSaques kafka = new KafkaProducerSaques();
+        try {
+            kafka.EnviarDadosClienteSaque(numero);
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
-    public ResponseEntity depositar(String numero, TransacaoModel transacao) {
-        Optional<ContaModel> conta = repository.findByNumero(numero);
+    public List<ContaModel> transferir(String numero1, String numero2, TransacaoModel transacao){
+        ContaModel conta1 = repository.findByNumero(numero1).orElseThrow(
+                ()-> new ContaNaoEncontrada("Conta com número " + numero1 + " não encontrada na base de dados."));
+        ContaModel conta2 = repository.findByNumero(numero2).orElseThrow(
+                ()-> new ContaNaoEncontrada("Conta com número " + numero2 + " não encontrada na base de dados."));
 
-        if (conta.isPresent()) {
-            return conta.map(busca -> {
-                busca.setSaldo(busca.getSaldo() + transacao.getValor());
-                ContaModel salvo = repository.save(busca);
+        checaSaldo(conta1, transacao);
+        checaValorNegativo(transacao);
 
-                salvarOperacao(salvo, transacao.getValor(), TipoOperacao.DEPOSITO.getDesc());
-                return ResponseEntity.ok().body(salvo);
-            }).orElse(ResponseEntity.notFound().build());
-        } else {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("mensagem:", "Conta não encontrada na base de dados.");
-            return ResponseEntity.status(404).body(jsonObject);
+        conta1.setSaldo(conta1.getSaldo() - transacao.getValor());
+        conta2.setSaldo(conta2.getSaldo() + transacao.getValor());
+        repository.save(conta1);
+        repository.save(conta2);
+        salvarOperacao(conta1, transacao.getValor(), TipoOperacao.TRANSFERENCIA_SAIDA.getDesc());
+        salvarOperacao(conta2, transacao.getValor(), TipoOperacao.TRANSFERENCIA.getDesc());
+
+        List<ContaModel> contas = new ArrayList<>();
+        contas.add(conta1);
+        contas.add(conta2);
+
+        return contas;
+
+    }
+
+    public void checaSaldo(ContaModel conta, TransacaoModel transacao){
+        if (conta.getSaldo() < transacao.getValor()){
+            throw new NaoHaSaldo("Não há saldo suficiente para completar a ação");
         }
     }
 
-    public ResponseEntity sacar(String numero, TransacaoModel transacao) {
-        Optional<ContaModel> conta = repository.findByNumero(numero);
-        if (conta.isPresent()) {
-            return conta.map(busca -> {
-                if (busca.getSaldo() > transacao.getValor()) {
-                    if (busca.getSaques() < busca.getTipo().getSaques()) {
-                        busca.setSaldo(busca.getSaldo() - transacao.getValor());
-                        ContaModel salvo = repository.save(busca);
-                        salvarOperacao(salvo, transacao.getValor(), TipoOperacao.SAQUE.getDesc());
-                        KafkaProducerSaques kafka = new KafkaProducerSaques();
-                        try {
-                            kafka.EnviarDadosClienteSaque(numero);
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        return ResponseEntity.ok().body(repository.findByNumero(numero));
-                    } else {
-                        TaxaService t = new TaxaService();
-                        int taxa = t.aplicarTaxa(conta);
-                        busca.setSaldo(busca.getSaldo() - transacao.getValor() - taxa);
-                        ContaModel salvo = repository.save(busca);
-                        salvarOperacao(salvo, transacao.getValor(), TipoOperacao.SAQUE.getDesc(), taxa);
-                        KafkaProducerSaques kafka = new KafkaProducerSaques();
-                        try {
-                            kafka.EnviarDadosClienteSaque(numero);
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        return ResponseEntity.ok().body(repository.findByNumero(numero));
-                    }
-                } else {
-                    JSONObject jsonObject = new JSONObject();
-                    jsonObject.put("mensagem:", "Erro. Não há saldo suficiente para realizar a operação.");
-                    return ResponseEntity.badRequest().body(jsonObject);
-                }
-            }).orElse(ResponseEntity.notFound().build());
-        } else {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("mensagem:", "Conta não encontrada na base de dados");
-            return ResponseEntity.status(404).body(jsonObject);
-        }
+    public void checaValorNegativo(TransacaoModel transacao){
+        if(transacao.getValor() <= 0)
+            throw new ValorNegativo("Não é possível realizar uma operação com valor menor ou igual a 0.");
     }
 
-    public ResponseEntity transferir(String numero1, String numero2, TransacaoModel transacao){
-        Optional<ContaModel> conta1 = repository.findByNumero(numero1);
-        Optional<ContaModel> conta2 = repository.findByNumero(numero2);
-
-        if (conta1.isPresent() && conta2.isPresent()) {
-            return conta1.map(busca -> {
-                if (busca.getSaldo() > transacao.getValor()) {
-                    busca.setSaldo(busca.getSaldo() - transacao.getValor());
-                    ContaModel salvo = repository.save(busca);
-
-                    conta2.map(busca2 -> {
-                        busca2.setSaldo(busca2.getSaldo() + transacao.getValor());
-                        ContaModel salvo2 = repository.save(busca2);
-                        salvarOperacao(salvo, transacao.getValor(), TipoOperacao.TRANSFERENCIA_SAIDA.getDesc());
-                        salvarOperacao(salvo2, transacao.getValor(), TipoOperacao.TRANSFERENCIA.getDesc());
-                        return ResponseEntity.ok().body(salvo2);
-                    });
-                    return ResponseEntity.ok().body(salvo);
-                } else {
-                    JSONObject jsonObject = new JSONObject();
-                    jsonObject.put("mensagem:", "Erro. Não há saldo suficiente para realizar a operação.");
-                    return ResponseEntity.badRequest().body(jsonObject);
-                }
-            }).orElse(ResponseEntity.notFound().build());
-        } else {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("mensagem:", "Erro. As contas não foram informadas corretamente.");
-            return ResponseEntity.badRequest().body(jsonObject);
-        }
-    }
-
-    public ResponseEntity<List<?>> extrato(String numero) {
-
+    public List<OperacoesModel> extrato(String numero) {
         List<OperacoesModel> op = repositoryOP.findAllByNumeroConta(numero);
-
         if (op.isEmpty()) {
-            List<String> json = Collections.singletonList("Não há nenhuma operação desta conta registrada na base de dados.");
-            return ResponseEntity.status(400).body(json);
-        } else {
-            return ResponseEntity.ok().body(op);
+            throw new SemRegistros("Não há nenhuma operação registrada para a conta de número " + numero + ".");
         }
+        return op;
     }
 
-    public ResponseEntity<List<?>> exibirExtratos() {
-        List<OperacoesModel> op = (List<OperacoesModel>) repositoryOP.findAll();
+    public List<OperacoesModel> exibirExtratos() {
+        List<OperacoesModel> op =  repositoryOP.findAll();
         if (op.isEmpty()) {
-            List<String> json = Collections.singletonList("Não há nenhum registro na base de dados.");
-            return ResponseEntity.status(404).body(json);
-        } else {
-            return ResponseEntity.ok().body(op);
+            throw new SemRegistros("Não há nenhuma operação registrada.");
         }
+        return op;
     }
 
 }

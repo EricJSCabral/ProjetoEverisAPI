@@ -29,10 +29,10 @@ public class ClienteControllerTest {
     @MockBean
     private ClienteService clienteService;
 
-    @BeforeEach
-    public void setup(){
-        standaloneSetup(this.clienteController);
-    }
+//    @BeforeEach
+//    public void setup(){
+//        standaloneSetup(this.clienteController);
+//    }
 
     @Test
     public void consultarDeveConsultarCliente() throws Exception {

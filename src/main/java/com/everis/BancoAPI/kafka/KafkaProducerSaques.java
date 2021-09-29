@@ -1,6 +1,7 @@
 package com.everis.BancoAPI.kafka;
 
 //import lombok.var;
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -10,7 +11,7 @@ import java.util.concurrent.ExecutionException;
 
 public class KafkaProducerSaques {
     public void EnviarDadosClienteSaque(String numero) throws ExecutionException, InterruptedException {
-        var producer = new org.apache.kafka.clients.producer.KafkaProducer<String, String>(properties());
+        var producer = new KafkaProducer<String, String>(properties());
         var value = numero;
         var record = new ProducerRecord<>("CONTROLE_SAQUES", value, value);
         producer.send(record, (data, ex) -> {

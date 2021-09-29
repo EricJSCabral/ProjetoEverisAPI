@@ -10,6 +10,9 @@ public class ErroFormulario {
         this.erro = erro;
     }
 
+    public ErroFormulario(){
+    }
+
     public String getCampo() {
         return campo;
     }
@@ -18,4 +21,11 @@ public class ErroFormulario {
         return erro;
     }
 
+    public void setCampo(String campo) {
+        this.campo = campo;
+    }
+
+    public void setErro(String erro) {
+        this.erro = erro;
+    }
 }

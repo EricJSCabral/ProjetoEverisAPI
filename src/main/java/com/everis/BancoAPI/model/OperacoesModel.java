@@ -1,10 +1,17 @@
 package com.everis.BancoAPI.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import javax.persistence.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Entity(name = "operacoes")
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class OperacoesModel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,57 +50,5 @@ public class OperacoesModel {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
         LocalDateTime dt = LocalDateTime.now();
         this.data = dt.format(formatter);
-    }
-
-
-    public OperacoesModel() {
-    }
-
-
-    public int getCod_operacao() {
-        return cod_operacao;
-    }
-
-    public void setCod_operacao(int cod_operacao) {
-        this.cod_operacao = cod_operacao;
-    }
-
-    public String getNumeroConta() {
-        return numeroConta;
-    }
-
-    public void setNumeroConta(String numeroConta) {
-        this.numeroConta = numeroConta;
-    }
-
-    public String getTipo() {
-        return tipo;
-    }
-
-    public void setTipo(String tipo) {
-        this.tipo = tipo;
-    }
-
-    public double getValor() {
-        return valor;
-    }
-
-    public void setValor(double valor) {
-        this.valor = valor; }
-
-    public int getTaxa() {
-        return taxa;
-    }
-
-    public void setTaxa(int taxa) {
-        this.taxa = taxa;
-    }
-
-    public String getData() {
-        return data;
-    }
-
-    public void setData(String data) {
-        this.data = data;
     }
 }
