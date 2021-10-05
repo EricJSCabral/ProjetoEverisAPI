@@ -1,6 +1,7 @@
 package com.everis.BancoAPI.kafka;
 
 //import lombok.var;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -9,6 +10,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+@Slf4j
 public class KafkaProducerSaques {
     public void EnviarDadosClienteSaque(String numero) throws ExecutionException, InterruptedException {
         var producer = new KafkaProducer<String, String>(properties());
@@ -19,7 +21,7 @@ public class KafkaProducerSaques {
                 ex.printStackTrace();
                 return;
             }
-            System.out.println("deu certo");
+            log.info("Conexão realizada com sucesso.");
         }).get();
     }
     private static Properties properties() {

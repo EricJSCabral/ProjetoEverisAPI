@@ -41,6 +41,12 @@ public class Handler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(erro);
     }
 
+    @ExceptionHandler(CodigoNaoEncontrado.class)
+    public ResponseEntity<ErroFormulario> handle (CodigoNaoEncontrado exception, HttpServletRequest request){
+        ErroFormulario erro = new ErroFormulario("codigo", exception.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(erro);
+    }
+
     @ExceptionHandler(ContaNaoEncontrada.class)
     public ResponseEntity<ErroFormulario> handle (ContaNaoEncontrada exception, HttpServletRequest request){
         ErroFormulario erro = new ErroFormulario("Numero", exception.getMessage());
@@ -56,6 +62,12 @@ public class Handler {
     @ExceptionHandler(NaoHaSaldo.class)
     public ResponseEntity<ErroFormulario> handle (NaoHaSaldo exception, HttpServletRequest request){
         ErroFormulario erro = new ErroFormulario("saldo", exception.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
+    }
+
+    @ExceptionHandler(ContaAtrelada.class)
+    public ResponseEntity<ErroFormulario> handle (ContaAtrelada exception, HttpServletRequest request){
+        ErroFormulario erro = new ErroFormulario("codigo", exception.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
     }
 
